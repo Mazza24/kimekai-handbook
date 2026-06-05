@@ -978,7 +978,14 @@ window.__applyRemote=function(data){
 </script>
 <script type="module">
 // Shared real-time sync. Paste your Firebase web config below to switch it on.
-const firebaseConfig = { /* __FIREBASE_CONFIG__ */ };
+const firebaseConfig = {
+  apiKey: "AIzaSyDeJoqefA5RZT_r8igoj3eYzbkoRtKEK8Y",
+  authDomain: "kimekai-handbook.firebaseapp.com",
+  projectId: "kimekai-handbook",
+  storageBucket: "kimekai-handbook.firebasestorage.app",
+  messagingSenderId: "62870862437",
+  appId: "1:62870862437:web:f805dcfde5de510db4648c"
+};
 if (firebaseConfig && firebaseConfig.projectId) {
   try {
     const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
@@ -995,14 +1002,14 @@ if (firebaseConfig && firebaseConfig.projectId) {
       }, 700);
     };
     const setPill = (s) => { const p = document.querySelector('.ver'); if (p) p.textContent = 'CSC Handbook · V1.2026 · ' + s; };
-    onSnapshot(ref, (snap) => {
-      if (!snap.exists()) { setDoc(ref, { data: window.__getLocalBlob(), w: clientId, t: Date.now() }).catch(() => {}); setPill('☁ synced'); return; }
+    setPill('☁ connecting…');
+    onSnapshot(ref, { includeMetadataChanges: true }, (snap) => {
+      const live = !snap.metadata.fromCache;           // true only once the server has answered
+      if (!snap.exists()) { if (live) setDoc(ref, { data: window.__getLocalBlob(), w: clientId, t: Date.now() }).catch(() => {}); setPill(live ? '☁ synced' : '☁ connecting…'); return; }
       const d = snap.data();
-      if (d.w === clientId) { setPill('☁ synced'); return; }
-      applying = true;
-      try { window.__applyRemote(d.data || {}); } finally { applying = false; }
-      setPill('☁ synced');
-    }, (err) => { console.warn('sync off:', err.message); });
+      if (d.w !== clientId) { applying = true; try { window.__applyRemote(d.data || {}); } finally { applying = false; } }
+      setPill(live ? '☁ synced' : '☁ connecting…');
+    }, (err) => { setPill('⚠ sync off'); console.warn('sync off:', err.message); });
   } catch (e) { console.warn('Firebase sync unavailable:', e); }
 }
 </script>
