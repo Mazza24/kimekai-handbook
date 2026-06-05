@@ -816,7 +816,7 @@ function highlight(root,q){
 
 // ---------- Persistence helpers ----------
 const LS=window.localStorage;
-function save(k,v){try{LS.setItem('kimekai_'+k,v);}catch(e){}}
+function save(k,v){try{LS.setItem('kimekai_'+k,v);}catch(e){} if(window.__cloudPush)window.__cloudPush();}
 function load(k){try{return LS.getItem('kimekai_'+k);}catch(e){return null;}}
 function stamp(id){const el=document.getElementById(id);if(el)el.textContent='saved ✓';}
 
@@ -959,6 +959,52 @@ function resetFaq(){if(confirm('Restore the default questions? This replaces the
   const saved=JSON.parse(load('faqs')||'null');
   (saved&&saved.length?saved:FAQ_DEFAULTS).forEach(faqRow);
 })();
+
+// ---------- Cloud sync bridge (shared team copy) ----------
+function rebuildChecks(){document.querySelectorAll('.check').forEach(list=>{const st=JSON.parse(load('chk_'+list.dataset.check)||'[]');[...list.children].forEach((li,i)=>{const cb=li.querySelector('input');cb.checked=!!st[i];li.classList.toggle('done',cb.checked);});});}
+function rebuildInputs(){document.querySelectorAll('[data-input]').forEach(el=>{if(document.activeElement!==el){const v=load('in_'+el.dataset.input);el.value=(v==null?'':v);}});}
+function rebuildEditables(){document.querySelectorAll('[data-save]').forEach(el=>{if(document.activeElement!==el){const s=load(el.dataset.save);if(s!=null){el.innerHTML=s;el.style.color='';el.dataset.empty='';applyPH(el);}}});}
+function rebuildTrackerSafe(){if(document.activeElement&&tbody.contains(document.activeElement))return;const saved=JSON.parse(load('tracker')||'null');tbody.innerHTML='';if(saved&&saved.length)saved.forEach(makeRow);else for(let i=0;i<4;i++)makeRow();}
+function rebuildFaqSafe(){if(document.activeElement&&faqBody.contains(document.activeElement))return;const saved=JSON.parse(load('faqs')||'null');faqBody.innerHTML='';(saved&&saved.length?saved:FAQ_DEFAULTS).forEach(faqRow);}
+window.__getLocalBlob=function(){const o={};for(let i=0;i<LS.length;i++){const k=LS.key(i);if(k&&k.indexOf('kimekai_')===0)o[k.slice(8)]=LS.getItem(k);}return o;};
+window.__applyRemote=function(data){
+  if(!data)return;
+  const keep=new Set(Object.keys(data)),rm=[];
+  for(let i=0;i<LS.length;i++){const k=LS.key(i);if(k&&k.indexOf('kimekai_')===0&&!keep.has(k.slice(8)))rm.push(k);}
+  rm.forEach(k=>LS.removeItem(k));
+  Object.keys(data).forEach(k=>LS.setItem('kimekai_'+k,data[k]));
+  rebuildChecks();rebuildInputs();rebuildEditables();rebuildTrackerSafe();rebuildFaqSafe();
+};
+</script>
+<script type="module">
+// Shared real-time sync. Paste your Firebase web config below to switch it on.
+const firebaseConfig = { /* __FIREBASE_CONFIG__ */ };
+if (firebaseConfig && firebaseConfig.projectId) {
+  try {
+    const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
+    const { getFirestore, doc, onSnapshot, setDoc } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+    const db = getFirestore(initializeApp(firebaseConfig));
+    const ref = doc(db, 'kimekai', 'handbookState');
+    const clientId = Math.random().toString(36).slice(2) + Date.now();
+    let pushTimer = null, applying = false;
+    window.__cloudPush = function () {
+      if (applying) return;
+      clearTimeout(pushTimer);
+      pushTimer = setTimeout(() => {
+        setDoc(ref, { data: window.__getLocalBlob(), w: clientId, t: Date.now() }).catch(() => {});
+      }, 700);
+    };
+    const setPill = (s) => { const p = document.querySelector('.ver'); if (p) p.textContent = 'CSC Handbook · V1.2026 · ' + s; };
+    onSnapshot(ref, (snap) => {
+      if (!snap.exists()) { setDoc(ref, { data: window.__getLocalBlob(), w: clientId, t: Date.now() }).catch(() => {}); setPill('☁ synced'); return; }
+      const d = snap.data();
+      if (d.w === clientId) { setPill('☁ synced'); return; }
+      applying = true;
+      try { window.__applyRemote(d.data || {}); } finally { applying = false; }
+      setPill('☁ synced');
+    }, (err) => { console.warn('sync off:', err.message); });
+  } catch (e) { console.warn('Firebase sync unavailable:', e); }
+}
 </script>
 </body>
 </html>
