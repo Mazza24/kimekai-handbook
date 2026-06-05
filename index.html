@@ -754,7 +754,7 @@
         <button class="act" onclick="exportDashboard()">📤 Export this week</button>
         <button class="act red" onclick="clearDashboard()">↻ Start a new week (clear entries)</button>
       </div>
-      <div class="savehint">💾 Dashboard entries save in this browser until you clear them. <b>Export downloads a .txt file</b> - save it into your <b>Erin [Lastname] ▸ CSC Weekly Handbook</b> folder, then start a new week.</div>
+      <div class="savehint">💾 Dashboard entries save in this browser until you clear them. <b>Export downloads a .txt file</b> - save it into your <b>Erin Jacobson ▸ CSC Weekly Handbook</b> folder, then start a new week.</div>
     </section>
 
     <section class="card" id="upkeep" data-title="Keeping This Current">
@@ -871,7 +871,7 @@ function exportDashboard(){
   a.href=URL.createObjectURL(new Blob([out],{type:'text/plain'}));
   a.download=fname; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(a.href),2000);
-  alert('Downloaded “'+fname+'” to your Downloads folder.\n\nFile it into:  Erin [Lastname] ▸ CSC Weekly Handbook\n\nThen you can Start a new week.');
+  alert('Downloaded “'+fname+'” to your Downloads folder.\n\nFile it into:  Erin Jacobson ▸ CSC Weekly Handbook\n\nThen you can Start a new week.');
 }
 
 // ---------- Checklists ----------
