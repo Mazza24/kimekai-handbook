@@ -98,6 +98,11 @@
   .placeholder-img{border:2px dashed var(--line);border-radius:12px;padding:30px;text-align:center;color:var(--grey);background:#fafbfd}
   small.muted{color:var(--grey);font-weight:400;font-size:12px}
   h4{margin:6px 0 4px}
+  .faqcell{outline:none}
+  .faqcell:focus{background:#fffdf8;box-shadow:inset 0 0 0 2px var(--gold)}
+  .faqcell:empty:before{content:attr(data-ph);color:#9aa3b2}
+  .faqdel{color:var(--red);cursor:pointer;font-weight:700;border:none;background:none;font-size:16px;line-height:1}
+  #faqTable td{vertical-align:top}
   /* form fields (reviews & dashboard) */
   .field{border:1px solid var(--line);border-radius:7px;padding:7px 9px;font-size:14px;font-family:inherit;width:100%;background:#fffdf8}
   .field:focus{border-color:var(--gold);background:#fff;outline:none}
@@ -496,18 +501,16 @@
 
     <section class="card" id="faq" data-title="FAQ Sheet">
       <h2>FAQ Sheet</h2>
-      <p class="lead">Grows over time - the goal is for you to handle more and more on your own. The Answer column is editable; type into it and it saves.</p>
+      <p class="lead">Grows over time - the goal is for you to handle more and more on your own. Both columns are editable: click any cell to edit, or use <b>+ Add question</b> to add your own. Everything saves automatically.</p>
       <table id="faqTable">
-        <tr><th style="width:38%">Question</th><th>Answer</th></tr>
-        <tr><td>What should we wear to a trial?</td><td class="editable-cell" contenteditable="true" data-save="faq1">Anything comfortable they won't get too hot in (until they have a Gi).</td></tr>
-        <tr><td>Is there parking?</td><td class="editable-cell" contenteditable="true" data-save="faq2">Yes - street parking is available.</td></tr>
-        <tr><td>What are the class times?</td><td class="editable-cell" contenteditable="true" data-save="faq3">See the Class Groups &amp; Intro Times section.</td></tr>
-        <tr><td>What age group is my child in?</td><td class="editable-cell" contenteditable="true" data-save="faq4">Thunderbolts 4–7 · Young Samurais 7–11 · Cadets 12–17 · Adults 18+. (Age 7 can suit either of the first two - clarify with the member.)</td></tr>
-        <tr><td>How much is it to try?</td><td class="editable-cell" contenteditable="true" data-save="faq5">The promo is $19.95 - 2 weeks unlimited + belt + Gi.</td></tr>
-        <tr><td>How much is ongoing membership?</td><td class="editable-cell" contenteditable="true" data-save="faq6">See the Membership Pricing section.</td></tr>
-        <tr><td>When are gradings?</td><td class="editable-cell" contenteditable="true" data-save="faq7"><b>Green belts and above</b> (Young Samurais, Cadets, Adults) grade every 3 months - <b>March, June, September &amp; December</b>. <b>Thunderbolts</b> grade whenever they're ready.</td></tr>
+        <thead><tr><th style="width:38%">Question</th><th>Answer</th><th style="width:44px"></th></tr></thead>
+        <tbody id="faqBody"></tbody>
       </table>
-      <div class="savehint">💾 Edits to answers save automatically in this browser.</div>
+      <div class="btnrow">
+        <button class="act" onclick="addFaq()">＋ Add question</button>
+        <button class="act ghost" onclick="resetFaq()">Restore default questions</button>
+      </div>
+      <div class="savehint">💾 Saved in this browser · <b id="faq-status"></b></div>
     </section>
 
     <section class="card" id="payments" data-title="Payments & Form Tracker">
@@ -751,7 +754,7 @@
         <button class="act" onclick="exportDashboard()">📤 Export this week</button>
         <button class="act red" onclick="clearDashboard()">↻ Start a new week (clear entries)</button>
       </div>
-      <div class="savehint">💾 Dashboard entries save in this browser until you clear them. <b>Export first</b> to keep a weekly record.</div>
+      <div class="savehint">💾 Dashboard entries save in this browser until you clear them. <b>Export downloads a .txt file</b> - save it into your <b>Erin [Lastname] ▸ CSC Weekly Handbook</b> folder, then start a new week.</div>
     </section>
 
     <section class="card" id="upkeep" data-title="Keeping This Current">
@@ -862,9 +865,13 @@ function exportDashboard(){
     const ta=l.nextElementSibling;
     if(ta&&ta.matches('textarea')) out+='\n'+l.textContent+':\n  '+(ta.value.trim()||'-')+'\n';
   });
-  navigator.clipboard?.writeText(out).then(
-    ()=>alert('Copied this week’s dashboard to your clipboard - paste it into an email or a saved note.\n\n'+out),
-    ()=>prompt('Copy this week’s dashboard:',out));
+  const safe=(week||'').replace(/[\\/:*?"<>|]+/g,'-').trim();
+  const fname='CSC Weekly Dashboard'+(safe?(' - '+safe):'')+'.txt';
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([out],{type:'text/plain'}));
+  a.download=fname; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  alert('Downloaded “'+fname+'” to your Downloads folder.\n\nFile it into:  Erin [Lastname] ▸ CSC Weekly Handbook\n\nThen you can Start a new week.');
 }
 
 // ---------- Checklists ----------
@@ -917,6 +924,40 @@ function copyUnpaid(){
   const saved=JSON.parse(load('tracker')||'null');
   if(saved&&saved.length)saved.forEach(makeRow);
   else{for(let i=0;i<4;i++)makeRow();}
+})();
+
+// ---------- FAQ (editable questions + answers) ----------
+const FAQ_DEFAULTS=[
+  {q:"What should we wear to a trial?",a:"Anything comfortable they won't get too hot in (until they have a Gi)."},
+  {q:"Is there parking?",a:"Yes - street parking is available."},
+  {q:"What are the class times?",a:"See the Class Groups &amp; Intro Times section."},
+  {q:"What age group is my child in?",a:"Thunderbolts 4&#8211;7 &middot; Young Samurais 7&#8211;11 &middot; Cadets 12&#8211;17 &middot; Adults 18+. (Age 7 can suit either of the first two - clarify with the member.)"},
+  {q:"How much is it to try?",a:"The promo is $19.95 - 2 weeks unlimited + belt + Gi."},
+  {q:"How much is ongoing membership?",a:"See the Membership Pricing section."},
+  {q:"When are gradings?",a:"<b>Green belts and above</b> (Young Samurais, Cadets, Adults) grade every 3 months - <b>March, June, September &amp; December</b>. <b>Thunderbolts</b> grade whenever they're ready."}
+];
+const faqBody=document.getElementById('faqBody');
+function faqData(){return [...faqBody.children].map(tr=>({
+  q:tr.querySelector('.fq').innerHTML, a:tr.querySelector('.fa').innerHTML}));}
+function saveFaq(){save('faqs',JSON.stringify(faqData()));stamp('faq-status');}
+function faqRow(d={q:'',a:''}){
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td class="faqcell fq" contenteditable="true" data-ph="Type a question…"></td>
+    <td class="faqcell fa" contenteditable="true" data-ph="Type the answer…"></td>
+    <td class="pd"><button class="faqdel" title="Remove">✕</button></td>`;
+  tr.querySelector('.fq').innerHTML=d.q;
+  tr.querySelector('.fa').innerHTML=d.a;
+  tr.querySelectorAll('.faqcell').forEach(c=>c.addEventListener('input',saveFaq));
+  tr.querySelector('.faqdel').onclick=()=>{tr.remove();saveFaq();};
+  faqBody.appendChild(tr);
+  return tr;
+}
+function addFaq(){const tr=faqRow();tr.querySelector('.fq').focus();saveFaq();}
+function resetFaq(){if(confirm('Restore the default questions? This replaces the current list.')){
+  faqBody.innerHTML='';FAQ_DEFAULTS.forEach(faqRow);saveFaq();}}
+(function initFaq(){
+  const saved=JSON.parse(load('faqs')||'null');
+  (saved&&saved.length?saved:FAQ_DEFAULTS).forEach(faqRow);
 })();
 </script>
 </body>
